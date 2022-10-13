@@ -1,17 +1,25 @@
 from argparse import ArgumentParser
 import torch
 from rasterio.windows import Window
-from dl_toolbox.torch_datasets import SemcityBdsdDs
+from torch.utils.tensorboard import SummaryWriter
+from callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
+
 import os
+import glob
 from torch.utils.data import DataLoader, RandomSampler, ConcatDataset
 from dl_toolbox.utils import worker_init_function
+from dl_toolbox.torch_datasets import InriaDs
 import segmentation_models_pytorch as smp
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.optim.lr_scheduler import LambdaLR
+from dl_toolbox.torch_collate import CustomCollate
 import time
 import tabulate
 
 
+
+#writer = SummaryWriter()
 def main():
 
     # parser for argument easier to launch .py file and inintalizing arg. correctly
@@ -35,96 +43,90 @@ def main():
     parser.add_argument('--max_epochs', type=int, default=100)
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
+    #parser.add_argument('--townA', type = str, default = 'austin')
     args = parser.parse_args()
-     # execution sur GPU si  ce dernier est dipo
+    # execution sur GPU si  ce dernier est dispo
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    torch.autograd.set_detect_anomaly(True)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
 
+    # temporaire  à changer pour mettre le nom de ville en args
+    townA_image_paths_list = glob.glob(os.path.join(args.data_path, 'images//austin*.tif'))
+    townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt//austin*.tif'))
+    print(len(townA_image_paths_list), len(townA_label_paths_list))
+
+    coef = 0.6
+    train_img_paths_list = townA_image_paths_list[:int(len(townA_image_paths_list)*coef)]
+    train_lbl_paths_list = townA_label_paths_list[:int(len(townA_label_paths_list)*coef)]
+
+    val_img_paths_list = townA_image_paths_list[int(len(townA_image_paths_list)*coef):]
+    val_lbl_paths_list = townA_label_paths_list[int(len(townA_label_paths_list)*coef):]
     # Train dataset
-    dataset1 = InriaDS(
-        image_path=os.path.join(args.data_path, 'austin11.tif'),
-        label_path=os.path.join(args.data_path, 'austin11.tif'),
-        fixed_crops=True,
-        tile=Window(
-            col_off=0,
-            row_off=0,
-            width=256,
-            height=256),
+    train_datasets = []
+    for image_path, label_path in zip(train_img_paths_list, train_lbl_paths_list):
+        print(image_path, label_path)
+        train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
+            tile=Window(col_off=500, row_off=500, width=256, height=256),
+            crop_size=args.crop_size,
+            crop_step=args.crop_size,
+            img_aug=args.img_aug))
 
-        crop_size=args.crop_size,
-        crop_step=args.crop_size,
-        img_aug=args.img_aug
-    )
-    dataset2 = InriaDS(
-        image_path=os.path.join(args.data_path, 'austin11.tif'),
-        label_path=os.path.join(args.data_path, 'austin11.tif'),
-        fixed_crops=True,
-        tile=Window(
-            col_off=400,
-            row_off=400,
-            width=256,
-            height=256
-        ),
-        crop_size=args.crop_size,
-        crop_step=args.crop_size,
-        img_aug=args.img_aug
-    )
-    trainset = ConcatDataset([dataset1, dataset2]) # <<--- get that shape
+    trainset = ConcatDataset(train_datasets)
 
-    valset = InriaDS(
-        image_path=os.path.join(args.data_path, 'austin11.tif'),
-        label_path=os.path.join(args.data_path, 'austin11.tif'),
-        fixed_crops=True,
-        tile=Window(
-            col_off=800,
-            row_off=800,
-            width=256,
-            height=256
-        ),
-        crop_size=args.crop_size,
-        crop_step=args.crop_size,
-        img_aug='no'
-    )
+    # Validation dataset
+    val_datasets = []
+    for image_path, label_path in zip(val_img_paths_list, val_lbl_paths_list):
+        val_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
+            tile=Window(col_off=500, row_off=500, width=256, height=256),
+            crop_size=args.crop_size,
+            crop_step=args.crop_size,
+            img_aug=args.img_aug))
+    valset =  ConcatDataset(val_datasets)
 
     train_sampler = RandomSampler(
         data_source=trainset,
-        replacement=True,
+        replacement=False,
         num_samples=args.epoch_len)
 
     train_dataloader = DataLoader(
         dataset=trainset,
         batch_size=args.sup_batch_size,
         sampler=train_sampler,
+        collate_fn = CustomCollate(batch_aug = 'no'),
         num_workers=args.workers)
-
+    #print(len(train_dataloader.dataset))
     val_dataloader = DataLoader(
         dataset=valset,
         shuffle=False,
         batch_size=args.sup_batch_size,
+        collate_fn = CustomCollate(batch_aug = 'no'),
         num_workers=args.workers)
+    #print(len(val_dataloader.dataset))
 
+    # Unet model for SS task
     model = smp.Unet(
         encoder_name=args.encoder,
         encoder_weights='imagenet' if args.pretrained else None,
         in_channels=args.in_channels,
-        classes=args.num_classes if args.train_with_void else args.num_classes
-                                                              - 1,
-        decoder_use_batchnorm=True
-    )
-
+        classes=args.num_classes if args.train_with_void else args.num_classes - 1,
+        decoder_use_batchnorm=True)
     model.to(device)
 
     # A changer pour le masking ("reduction=none")
+    # initializing loss function
     loss_fn = torch.nn.BCEWithLogitsLoss()
+    print(loss_fn)
 
+    # initializing the optimizer
+    #optimizer = Adam(model.parameters(), lr=0.01)
     optimizer = SGD(
         model.parameters(),
         lr=args.initial_lr,
-        momentum=0.9,
-    )
+        momentum=0.9)
 
+    # definition of learning rate
     def lambda_lr(epoch):
 
         m = epoch / args.max_epochs
@@ -137,21 +139,16 @@ def main():
         else:
             return args.final_lr / args.initial_lr
 
-    scheduler = LambdaLR(
-        optimizer,
-        lr_lambda=lambda_lr
-    )
+
+    scheduler = LambdaLR(optimizer,lr_lambda= lambda_lr, verbose = True)
 
     start_epoch = 0
     columns = ['ep', 'train_loss', 'val_loss', 'time']
-
+    print("Loop over train_dataset X times")
     for epoch in range(start_epoch, args.max_epochs):
 
         time_ep = time.time()
-
-
         loss_sum = 0.0
-
         model.train()
 
         for i, batch in enumerate(train_dataloader):
@@ -159,48 +156,63 @@ def main():
             image = batch['image'].to(device)
             target = batch['mask'].to(device)
 
+            # clear gradients wrt parameters
             optimizer.zero_grad()
 
-            # mask processing to do here
+            # mask processing to do here ???
             #######################
 
+            # forward to get outputs
             logits = model(image)
+            #print("LOGITS",logits)
 
-            # loss computation with masks to do here instead
+            # calculate loss
             #######################
             loss = loss_fn(logits, target)
+            #print("LOSS", loss)
 
+            # getting gradients wrt parameters
             loss.backward()
+            # updating parameters
             optimizer.step()
 
             loss_sum += loss.item()
+            print(loss_sum)
 
+        print(len(train_dataloader))
         train_res = {'loss': loss_sum / len(train_dataloader)}
+        print(train_res)
 
         loss_sum = 0.0
         scheduler.step()
 
-
         model.eval()
-
+        print("Loop over val dataset X times ")
         for i, batch in enumerate(val_dataloader):
 
             image = batch['image'].to(device)
             target = batch['mask'].to(device)
 
-            output = model(image)
-            loss = loss_fn(output, target)
+            output = model(image) # use this output in display_batch func
+            #print(output)
+
+            loss = loss_fn(output, target) # computing loss <> predicted output and labels
+            print(loss)
 
             loss_sum += loss.item()
+            print(loss_sum)
 
-        val_res = {'loss': loss_sum / len(val_dataloader)}
+        print(len(val_dataloader))
+        val_res = {'loss': loss_sum / len(val_dataloader)} #
+        print(val_res)
 
         time_ep = time.time() - time_ep
+        print(time_ep)
         values = [epoch + 1, train_res['loss'], val_res['loss'], time_ep]
         table = tabulate.tabulate([values], columns, tablefmt='simple',
                                   floatfmt='8.4f')
         print(table)
-
+# do not forget to save model once evrthing is good
 
 if __name__ == "__main__":
 
