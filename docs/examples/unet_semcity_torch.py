@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import torch
 from rasterio.windows import Window
 from torch.utils.tensorboard import SummaryWriter
-from callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
+#from callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
 
 import os
@@ -21,6 +21,7 @@ import tabulate
 
 #writer = SummaryWriter()
 def main():
+    writer = SummaryWriter("INRIA -- pytorch  unet model trained on ViennA -- fromscratch -- 2")
 
     # parser for argument easier to launch .py file and inintalizing arg. correctly
     parser = ArgumentParser()
@@ -43,12 +44,12 @@ def main():
     parser.add_argument('--max_epochs', type=int, default=100)
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    #parser.add_argument('--townA', type = str, default = 'austin')
+    #parser.add_argument('--townB', type = str)
     args = parser.parse_args()
     # execution sur GPU si  ce dernier est dispo
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(True) # stops training if something is wrong
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
 
@@ -57,32 +58,40 @@ def main():
     townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt//austin*.tif'))
     print(len(townA_image_paths_list), len(townA_label_paths_list))
 
-    coef = 0.6
+    coef = 0.7
     train_img_paths_list = townA_image_paths_list[:int(len(townA_image_paths_list)*coef)]
     train_lbl_paths_list = townA_label_paths_list[:int(len(townA_label_paths_list)*coef)]
 
     val_img_paths_list = townA_image_paths_list[int(len(townA_image_paths_list)*coef):]
     val_lbl_paths_list = townA_label_paths_list[int(len(townA_label_paths_list)*coef):]
+            
     # Train dataset
     train_datasets = []
     for image_path, label_path in zip(train_img_paths_list, train_lbl_paths_list):
-        print(image_path, label_path)
-        train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
-            tile=Window(col_off=500, row_off=500, width=256, height=256),
-            crop_size=args.crop_size,
-            crop_step=args.crop_size,
-            img_aug=args.img_aug))
+        for coloffset in range(20) :
+            print(coloffset)
+            for rowoffset in range(20):
+                print(rowoffset)
+                train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
+                            tile=Window(col_off=coloffset , row_off=rowoffset, width=256, height=256),
+                            crop_size=args.crop_size,
+                            crop_step=args.crop_size,
+                            img_aug=args.img_aug))
 
     trainset = ConcatDataset(train_datasets)
 
     # Validation dataset
     val_datasets = []
-    for image_path, label_path in zip(val_img_paths_list, val_lbl_paths_list):
-        val_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
-            tile=Window(col_off=500, row_off=500, width=256, height=256),
-            crop_size=args.crop_size,
-            crop_step=args.crop_size,
-            img_aug=args.img_aug))
+    for image_path, label_path in zip(train_img_paths_list, train_lbl_paths_list):
+        for coloffset in range(20) :
+            print(coloffset)
+            for rowoffset in range(20):
+                print(rowoffset)
+                val_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
+                            tile=Window(col_off=coloffset , row_off=rowoffset, width=256, height=256),
+                            crop_size=args.crop_size,
+                            crop_step=args.crop_size,
+                            img_aug=args.img_aug))
     valset =  ConcatDataset(val_datasets)
 
     train_sampler = RandomSampler(
@@ -111,7 +120,7 @@ def main():
         encoder_weights='imagenet' if args.pretrained else None,
         in_channels=args.in_channels,
         classes=args.num_classes if args.train_with_void else args.num_classes - 1,
-        decoder_use_batchnorm=True)
+        decoder_use_batchnorm=True, activation = 'softmax')
     model.to(device)
 
     # A changer pour le masking ("reduction=none")
@@ -143,47 +152,52 @@ def main():
     scheduler = LambdaLR(optimizer,lr_lambda= lambda_lr, verbose = True)
 
     start_epoch = 0
-    columns = ['ep', 'train_loss', 'val_loss', 'time']
+    columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
     print("Loop over train_dataset X times")
     for epoch in range(start_epoch, args.max_epochs):
 
         time_ep = time.time()
         loss_sum = 0.0
+        num_examples_train = 0.0
+        num_correct_train = 0.0
         model.train()
 
         for i, batch in enumerate(train_dataloader):
 
             image = batch['image'].to(device)
-            target = batch['mask'].to(device)
-
+            target = batch['mask'].to(device)/255.
             # clear gradients wrt parameters
             optimizer.zero_grad()
-
             # mask processing to do here ???
             #######################
-
             # forward to get outputs
             logits = model(image)
             #print("LOGITS",logits)
-
             # calculate loss
             #######################
             loss = loss_fn(logits, target)
             #print("LOSS", loss)
-
+            correct_train= torch.eq(torch.argmax(logits, 1)[1],target).view(-1)
+            num_correct_train += torch.sum(correct_train).item()
+            num_examples_train += correct_train.shape[0]
             # getting gradients wrt parameters
             loss.backward()
             # updating parameters
             optimizer.step()
 
             loss_sum += loss.item()
-            print(loss_sum)
+            
+            print("LOSS SUM: ",loss_sum)
 
         print(len(train_dataloader))
-        train_res = {'loss': loss_sum / len(train_dataloader)}
-        print(train_res)
+        train_loss = {'loss': loss_sum / len(train_dataloader)}
+        train_acc = {'acc': num_correct_train/num_examples_train}
+        
 
         loss_sum = 0.0
+        num_examples_val = 0.0
+        num_correct_val = 0.0
+        
         scheduler.step()
 
         model.eval()
@@ -191,27 +205,40 @@ def main():
         for i, batch in enumerate(val_dataloader):
 
             image = batch['image'].to(device)
-            target = batch['mask'].to(device)
+            target = batch['mask'].to(device)/255.
 
             output = model(image) # use this output in display_batch func
             #print(output)
 
             loss = loss_fn(output, target) # computing loss <> predicted output and labels
             print(loss)
-
+            
+            correct_val  = torch.eq(torch.argmax(output, 1)[1],target).view(-1)
+            num_correct_val += torch.sum(correct_val).item()
+            num_examples_val += correct_val.shape[0]
+            
             loss_sum += loss.item()
-            print(loss_sum)
+            
+            
 
-        print(len(val_dataloader))
-        val_res = {'loss': loss_sum / len(val_dataloader)} #
-        print(val_res)
+        
+        val_loss = {'loss': loss_sum / len(val_dataloader)} 
+        val_acc = {'acc': num_correct_val/ num_examples_val}
+        
 
         time_ep = time.time() - time_ep
         print(time_ep)
-        values = [epoch + 1, train_res['loss'], val_res['loss'], time_ep]
+        values = [epoch + 1, train_loss['loss'], val_loss['loss'],train_acc['acc'],val_acc['acc'], time_ep]
         table = tabulate.tabulate([values], columns, tablefmt='simple',
                                   floatfmt='8.4f')
+        
+        writer.add_scalar('Loss/train', train_loss['loss'], epoch+1)
+        writer.add_scalar('Loss/val', val_loss['loss'], epoch+1)
+        writer.add_scalar('Acc/train', train_acc['acc'], epoch+1)
+        writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
         print(table)
+    writer.flush()
+    writer.close()
 # do not forget to save model once evrthing is good
 
 if __name__ == "__main__":
