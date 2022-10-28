@@ -73,7 +73,7 @@ def main():
             for rowoffset in range(20):
                 print(rowoffset)
                 train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
-                            tile=Window(col_off=coloffset , row_off=rowoffset, width=256, height=256),
+                            tile=Window(col_off=coloffset*256 , row_off=rowoffset*256, width=256, height=256),
                             crop_size=args.crop_size,
                             crop_step=args.crop_size,
                             img_aug=args.img_aug))
@@ -88,7 +88,7 @@ def main():
             for rowoffset in range(20):
                 print(rowoffset)
                 val_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
-                            tile=Window(col_off=coloffset , row_off=rowoffset, width=256, height=256),
+                            tile=Window(col_off=coloffset*256 , row_off=rowoffset*256, width=256, height=256),
                             crop_size=args.crop_size,
                             crop_step=args.crop_size,
                             img_aug=args.img_aug))
