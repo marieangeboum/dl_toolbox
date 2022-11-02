@@ -21,7 +21,7 @@ import tabulate
 
 #writer = SummaryWriter()
 def main():
-    writer = SummaryWriter("INRIA -- pytorch  unet model trained on ViennA -- fromscratch -- 2")
+    writer = SummaryWriter("INRIA -- pytorch unet model trained on Vienna -- fromscratch -- 5")
 
     # parser for argument easier to launch .py file and inintalizing arg. correctly
     parser = ArgumentParser()
@@ -58,7 +58,7 @@ def main():
     townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt//austin*.tif'))
     print(len(townA_image_paths_list), len(townA_label_paths_list))
 
-    coef = 0.7
+    coef = 0.8
     train_img_paths_list = townA_image_paths_list[:int(len(townA_image_paths_list)*coef)]
     train_lbl_paths_list = townA_label_paths_list[:int(len(townA_label_paths_list)*coef)]
 
@@ -68,30 +68,21 @@ def main():
     # Train dataset
     train_datasets = []
     for image_path, label_path in zip(train_img_paths_list, train_lbl_paths_list):
-        for coloffset in range(20) :
-            print(coloffset)
-            for rowoffset in range(20):
-                print(rowoffset)
-                train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
-                            tile=Window(col_off=coloffset*256 , row_off=rowoffset*256, width=256, height=256),
+        train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = False,
+                            tile=Window(col_off=0, row_off=0, width=5000, height=5000),
                             crop_size=args.crop_size,
                             crop_step=args.crop_size,
                             img_aug=args.img_aug))
-
     trainset = ConcatDataset(train_datasets)
 
     # Validation dataset
     val_datasets = []
     for image_path, label_path in zip(train_img_paths_list, train_lbl_paths_list):
-        for coloffset in range(20) :
-            print(coloffset)
-            for rowoffset in range(20):
-                print(rowoffset)
-                val_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
-                            tile=Window(col_off=coloffset*256 , row_off=rowoffset*256, width=256, height=256),
+         val_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = True,
+                            tile=Window(col_off=0, row_off=0, width=5000, height=5000),
                             crop_size=args.crop_size,
                             crop_step=args.crop_size,
-                            img_aug=args.img_aug))
+                            img_aug=args.img_aug))  
     valset =  ConcatDataset(val_datasets)
 
     train_sampler = RandomSampler(
@@ -177,7 +168,7 @@ def main():
             #######################
             loss = loss_fn(logits, target)
             #print("LOSS", loss)
-            correct_train= torch.eq(torch.argmax(logits, 1)[1],target).view(-1)
+            correct_train = torch.eq(torch.softmax(logits, 1).argmax(1),target).view(-1)
             num_correct_train += torch.sum(correct_train).item()
             num_examples_train += correct_train.shape[0]
             # getting gradients wrt parameters
@@ -213,7 +204,7 @@ def main():
             loss = loss_fn(output, target) # computing loss <> predicted output and labels
             print(loss)
             
-            correct_val  = torch.eq(torch.argmax(output, 1)[1],target).view(-1)
+            correct_val  = torch.eq(torch.softmax(output, 1).argmax(1),target).view(-1)
             num_correct_val += torch.sum(correct_val).item()
             num_examples_val += correct_val.shape[0]
             
@@ -239,6 +230,7 @@ def main():
         print(table)
     writer.flush()
     writer.close()
+    torch.save(model.state_dict(),'smp_unet_vienna_fromscratch5.pt')
 # do not forget to save model once evrthing is good
 
 if __name__ == "__main__":
