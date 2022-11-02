@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import torch
 from rasterio.windows import Window
 from torch.utils.tensorboard import SummaryWriter
-#from callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
+from dl_toolbox.callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
 
 import os
