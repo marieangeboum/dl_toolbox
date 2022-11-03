@@ -111,7 +111,7 @@ def main():
         encoder_weights='imagenet' if args.pretrained else None,
         in_channels=args.in_channels,
         classes=args.num_classes if args.train_with_void else args.num_classes - 1,
-        decoder_use_batchnorm=True, activation = 'softmax')
+        decoder_use_batchnorm=True)
     model.to(device)
 
     # A changer pour le masking ("reduction=none")
