@@ -1,27 +1,39 @@
-from argparse import ArgumentParser
-import torch
-from rasterio.windows import Window
-from torch.utils.tensorboard import SummaryWriter
-from dl_toolbox.callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
-
 import os
 import glob
-from torch.utils.data import DataLoader, RandomSampler, ConcatDataset
-from dl_toolbox.utils import worker_init_function
-from dl_toolbox.torch_datasets import InriaDs
-import segmentation_models_pytorch as smp
-from torch.optim import SGD, Adam
-from torch.optim.lr_scheduler import LambdaLR
-from dl_toolbox.torch_collate import CustomCollate
+
 import time
 import tabulate
 
+import torch
+import matplotlib.pyplot as plt
+from rasterio.windows import Window
+from argparse import ArgumentParser
+
+from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader, RandomSampler, ConcatDataset
+from torch.optim import SGD, Adam
+from torch.optim.lr_scheduler import LambdaLR
+from torchvision import datasets, transforms
+from torchmetrics import Accuracy
+import segmentation_models_pytorch as smp
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, StochasticWeightAveraging
+
+import dl_toolbox.inference as dl_inf
+from dl_toolbox.torch_collate import CustomCollate
+from dl_toolbox.networks import UNet
+from dl_toolbox.callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
+from dl_toolbox.callbacks import plot_confusion_matrix, compute_conf_mat, EarlyStopping
+from dl_toolbox.utils import worker_init_function
+from dl_toolbox.torch_datasets import InriaDs
+from dl_toolbox.torch_datasets.utils import *
+
+from captum.insights import AttributionVisualizer, Batch
+from captum.insights.attr_vis.features import ImageFeature
 
 
 #writer = SummaryWriter()
 def main():
-    writer = SummaryWriter("INRIA -- pytorch unet model trained on Vienna -- fromscratch -- 5")
+   
 
     # parser for argument easier to launch .py file and inintalizing arg. correctly
     parser = ArgumentParser()
@@ -54,8 +66,8 @@ def main():
     torch.cuda.manual_seed(args.seed)
 
     # temporaire  à changer pour mettre le nom de ville en args
-    townA_image_paths_list = glob.glob(os.path.join(args.data_path, 'images//austin*.tif'))
-    townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt//austin*.tif'))
+    townA_image_paths_list = glob.glob(os.path.join(args.data_path, 'images//vienna*.tif'))
+    townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt//vienna*.tif'))
     print(len(townA_image_paths_list), len(townA_label_paths_list))
 
     coef = 0.8
@@ -67,6 +79,7 @@ def main():
             
     # Train dataset
     train_datasets = []
+    
     for image_path, label_path in zip(train_img_paths_list, train_lbl_paths_list):
         train_datasets.append(InriaDs(image_path = image_path, label_path = label_path, fixed_crops = False,
                             tile=Window(col_off=0, row_off=0, width=5000, height=5000),
@@ -144,7 +157,10 @@ def main():
 
     start_epoch = 0
     columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
-    print("Loop over train_dataset X times")
+    writer = SummaryWriter("INRIA--smp_unet Vienna--epoch_len-{}sup_batch_size-{}max_epochs-{}".format(args.epoch_len,args.sup_batch_size,args.max_epochs))
+    viz = SegmentationImagesVisualisation(writer = writer)
+    early_stopping = EarlyStopping(patience=20, verbose=True)
+    
     for epoch in range(start_epoch, args.max_epochs):
 
         time_ep = time.time()
@@ -168,13 +184,13 @@ def main():
             #######################
             loss = loss_fn(logits, target)
             #print("LOSS", loss)
-            correct_train = torch.eq(torch.softmax(logits, 1).argmax(1),target).view(-1)
-            num_correct_train += torch.sum(correct_train).item()
-            num_examples_train += correct_train.shape[0]
+            
             # getting gradients wrt parameters
             loss.backward()
             # updating parameters
             optimizer.step()
+            accuracy = Accuracy(num_classes=2).cuda()
+            acc_sum += accuracy(torch.transpose(logits,0,1).reshape(2, -1).t(), torch.transpose(target.to(torch.uint8),0,1).reshape(2, -1).t())
 
             loss_sum += loss.item()
             
@@ -182,8 +198,9 @@ def main():
 
         print(len(train_dataloader))
         train_loss = {'loss': loss_sum / len(train_dataloader)}
-        train_acc = {'acc': num_correct_train/num_examples_train}
-        
+        train_acc = {'acc': acc_sum/len(train_dataloader)}
+        writer.add_scalar('Loss/train', train_loss['loss'], epoch+1)
+        writer.add_scalar('Acc/train', train_acc['acc'], epoch+1)
 
         loss_sum = 0.0
         num_examples_val = 0.0
@@ -192,7 +209,7 @@ def main():
         scheduler.step()
 
         model.eval()
-        print("Loop over val dataset X times ")
+        
         for i, batch in enumerate(val_dataloader):
 
             image = batch['image'].to(device)
@@ -203,18 +220,25 @@ def main():
 
             loss = loss_fn(output, target) # computing loss <> predicted output and labels
             print(loss)
+            batch['preds'] = output
+            cm = compute_conf_mat(
+                torch.tensor(target).flatten().cpu(),
+                torch.tensor((torch.sigmoid(output)>0.5).cpu().long().flatten().cpu()), 2)
             
             correct_val  = torch.eq(torch.softmax(output, 1).argmax(1),target).view(-1)
             num_correct_val += torch.sum(correct_val).item()
             num_examples_val += correct_val.shape[0]
             
             loss_sum += loss.item()
+            accuracy = Accuracy(num_classes=2).cuda()
+            acc_sum += accuracy(torch.transpose(output,0,1).reshape(2, -1).t(), torch.transpose(target.to(torch.uint8),0,1).reshape(2, -1).t())
             
-            
-
-        
         val_loss = {'loss': loss_sum / len(val_dataloader)} 
-        val_acc = {'acc': num_correct_val/ num_examples_val}
+        val_acc = {'acc': acc_sum/ len(val_dataloader)}
+        if early_stopping.early_stop:
+                print("Early stopping")
+                break
+            
         
 
         time_ep = time.time() - time_ep
@@ -223,16 +247,19 @@ def main():
         table = tabulate.tabulate([values], columns, tablefmt='simple',
                                   floatfmt='8.4f')
         
-        writer.add_scalar('Loss/train', train_loss['loss'], epoch+1)
         writer.add_scalar('Loss/val', val_loss['loss'], epoch+1)
-        writer.add_scalar('Acc/train', train_acc['acc'], epoch+1)
         writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
+        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['no building','building']), epoch+1)
         print(table)
     writer.flush()
     writer.close()
-    torch.save(model.state_dict(),'smp_unet_vienna_fromscratch5.pt')
+    torch.save(model.state_dict(),'smp_unet_vienna_FS.pt')
 # do not forget to save model once evrthing is good
-
+# save metrics 
+# with open('metrics_final_valid_batch.txt', mode='w') as file_object:
+#      print(metrics_per_class_df, file=file_object)
+#      print(macro_average_metrics_df, file=file_object)
+#      print(micro_average_metrics_df, file=file_object)
 if __name__ == "__main__":
 
     main()
