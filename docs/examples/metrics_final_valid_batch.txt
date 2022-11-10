@@ -1,0 +1,9 @@
+         F1    Recall  Precision       IoU
+0  0.975406  0.973377   0.977445  0.951993
+1  0.908334  0.915449   0.901329  0.832062
+
+   macroF1  macroRecall  macroPrecision  macroIoU  OAccuracy     Kappa
+0  0.94187     0.944413        0.939387  0.892028   0.961218  0.883742
+
+    microF1  microRecall  microPrecision  microIoU
+0  0.961218     0.961218        0.961218  0.925332
