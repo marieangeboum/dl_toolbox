@@ -56,7 +56,7 @@ def main():
     parser.add_argument('--max_epochs', type=int, default=100)
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    #parser.add_argument('--townB', type = str)
+    parser.add_argument('--townA', type = str, default = 'austin')
     args = parser.parse_args()
     # execution sur GPU si  ce dernier est dispo
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -66,11 +66,11 @@ def main():
     torch.cuda.manual_seed(args.seed)
 
     # temporaire  à changer pour mettre le nom de ville en args
-    townA_image_paths_list = glob.glob(os.path.join(args.data_path, 'images//vienna*.tif'))
-    townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt//vienna*.tif'))
-    print(len(townA_image_paths_list), len(townA_label_paths_list))
+    townA_image_paths_list = glob.glob(os.path.join('/data/INRIA/AerialImageDataset/train', 'images/{}*.tif'.format(args.townA)))
+    townA_label_paths_list = glob.glob(os.path.join('/data/INRIA/AerialImageDataset/train', 'gt/{}*.tif'.format(args.townA)))
 
-    coef = 0.8
+
+    coef = 0.7
     train_img_paths_list = townA_image_paths_list[:int(len(townA_image_paths_list)*coef)]
     train_lbl_paths_list = townA_label_paths_list[:int(len(townA_label_paths_list)*coef)]
 
@@ -157,9 +157,11 @@ def main():
 
     start_epoch = 0
     columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
-    writer = SummaryWriter("INRIA--smp_unet Vienna--epoch_len-{}sup_batch_size-{}max_epochs-{}".format(args.epoch_len,args.sup_batch_size,args.max_epochs))
-    viz = SegmentationImagesVisualisation(writer = writer)
-    early_stopping = EarlyStopping(patience=20, verbose=True)
+    writer = SummaryWriter("INRIA--smp_unet_{}--epoch_len-{}-sup_batch_size-{}-max_epochs-{}".format(args.townA, args.epoch_len,args.sup_batch_size,args.max_epochs))
+    viz = SegmentationImagesVisualisation(writer = writer,freq = 10)
+
+    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}.pt'.format(args.townA))
+
     
     for epoch in range(start_epoch, args.max_epochs):
 
@@ -172,7 +174,10 @@ def main():
         for i, batch in enumerate(train_dataloader):
 
             image = batch['image'].to(device)
-            target = batch['mask'].to(device)/255.
+            target = (batch['mask']/255.).to(device)
+            norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaAustinDs.stats['std'])])
+            image = norm_transforms(image).to(device)
+            
             # clear gradients wrt parameters
             optimizer.zero_grad()
             # mask processing to do here ???
@@ -184,7 +189,8 @@ def main():
             #######################
             loss = loss_fn(logits, target)
             #print("LOSS", loss)
-            
+            batch['preds'] = logits
+            batch['image'] = image
             # getting gradients wrt parameters
             loss.backward()
             # updating parameters
@@ -197,14 +203,14 @@ def main():
             print("LOSS SUM: ",loss_sum)
 
         print(len(train_dataloader))
+        viz.display_batch(writer, batch, 20,epoch,prefix='train')
         train_loss = {'loss': loss_sum / len(train_dataloader)}
         train_acc = {'acc': acc_sum/len(train_dataloader)}
         writer.add_scalar('Loss/train', train_loss['loss'], epoch+1)
         writer.add_scalar('Acc/train', train_acc['acc'], epoch+1)
 
         loss_sum = 0.0
-        num_examples_val = 0.0
-        num_correct_val = 0.0
+        acc_sum = 0.0
         
         scheduler.step()
 
@@ -213,47 +219,52 @@ def main():
         for i, batch in enumerate(val_dataloader):
 
             image = batch['image'].to(device)
-            target = batch['mask'].to(device)/255.
+            target = (batch['mask']/255.).to(device)
+            norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaAustinDs.stats['std'])])
+            image = norm_transforms(image).to(device)
 
             output = model(image) # use this output in display_batch func
             #print(output)
 
             loss = loss_fn(output, target) # computing loss <> predicted output and labels
-            print(loss)
+            
             batch['preds'] = output
+            batch['image'] = image
+            
             cm = compute_conf_mat(
                 torch.tensor(target).flatten().cpu(),
                 torch.tensor((torch.sigmoid(output)>0.5).cpu().long().flatten().cpu()), 2)
             
-            correct_val  = torch.eq(torch.softmax(output, 1).argmax(1),target).view(-1)
-            num_correct_val += torch.sum(correct_val).item()
-            num_examples_val += correct_val.shape[0]
+            
             
             loss_sum += loss.item()
             accuracy = Accuracy(num_classes=2).cuda()
             acc_sum += accuracy(torch.transpose(output,0,1).reshape(2, -1).t(), torch.transpose(target.to(torch.uint8),0,1).reshape(2, -1).t())
-            
+        viz.display_batch(writer, batch,10, epoch,prefix = 'val')    
         val_loss = {'loss': loss_sum / len(val_dataloader)} 
         val_acc = {'acc': acc_sum/ len(val_dataloader)}
+        early_stopping(val_loss['loss'], model)
         if early_stopping.early_stop:
                 print("Early stopping")
                 break
             
-        
-
         time_ep = time.time() - time_ep
-        print(time_ep)
+        writer.add_scalar('Loss/val', val_loss['loss'], epoch+1)
+        writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
+        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['no building','building']), epoch+1)
+        
+        
         values = [epoch + 1, train_loss['loss'], val_loss['loss'],train_acc['acc'],val_acc['acc'], time_ep]
         table = tabulate.tabulate([values], columns, tablefmt='simple',
                                   floatfmt='8.4f')
         
-        writer.add_scalar('Loss/val', val_loss['loss'], epoch+1)
-        writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
-        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['no building','building']), epoch+1)
+       
         print(table)
+    writer.add_graph(model, image)
     writer.flush()
     writer.close()
-    torch.save(model.state_dict(),'smp_unet_vienna_FS.pt')
+    torch.save(model.state_dict(),'smp_unet_{}.pt'.format(args.townA))
+
 # do not forget to save model once evrthing is good
 # save metrics 
 # with open('metrics_final_valid_batch.txt', mode='w') as file_object:
