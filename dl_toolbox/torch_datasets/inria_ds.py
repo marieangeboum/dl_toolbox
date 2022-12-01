@@ -23,16 +23,19 @@ import matplotlib.pyplot as plt
 
 class InriaDs(Dataset):
 
-    def __init__(self,image_path,tile,fixed_crops, crop_size,crop_step, img_aug='no',label_path=None, *args,**kwargs):
+    def __init__(self,image_path,tile,fixed_crops, crop_size,crop_step, img_aug,label_path=None, *args,**kwargs):
 
         self.image_path = image_path # path to image
         self.label_path = label_path # pth to corresponding label
         self.tile = tile # initializing a tile to be extracted from image
-        self.crop_windows = list(get_tiles(nols=tile.width,nrows=tile.height, size=crop_size,
+        self.crop_windows = list(get_tiles(
+            nols=tile.width,
+            nrows=tile.height, 
+            size=crop_size,
             step=crop_step,
             row_offset=tile.row_off,
             col_offset=tile.col_off)) if fixed_crops else None # returns a list of tile these are crop extracted from the initial img
-        print("cop windows", self.crop_windows)
+        #print("crop windows", self.crop_windows)
         self.crop_size = crop_size # initializing crop size
         self.img_aug = get_transforms(img_aug)
 
@@ -48,14 +51,14 @@ class InriaDs(Dataset):
         return len(self.crop_windows) if self.crop_windows else 1
 
     def __getitem__(self, idx):
-        ''' Given index idx this function loads a sample  from the dataset baased on index.
+        ''' Given index idx this function loads a sample  from the dataset based on index.
             It identifies image'location on disk, converts it to a tensor
         '''
 
         # in order to visualize what goes IN the network
-        out_path = 'C:/Users/marie/ML/SSL4Remote/output/'
-        output_filename = 'tile_{}-{}.tif' # image file name
-        output_gt_filename = 'tile_gt_{}-{}.tif' # corresponding label file name
+        # out_path = 'C:/Users/marie/ML/SSL4Remote/output/'
+        # output_filename = 'tile_{}-{}.tif' # image file name
+        # output_gt_filename = 'tile_gt_{}-{}.tif' # corresponding label file name
 
         if self.crop_windows:# if self.windows is initialized correctly begin iteration on said list
             window = self.crop_windows[idx]
@@ -106,25 +109,42 @@ class InriaDs(Dataset):
                 'window':window,
                 'image':final_image,
                 'mask':final_mask}
+    
+class InriaAustinDs(InriaDs): 
+    stats = {}
+    stats['mean'] = np.array([100.94032, 103.52946, 97.66165])
+    stats['std'] = np.array([44.22200128195357, 42.98435115090359, 41.719143816688884])
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
+class InriaViennaDs(InriaDs):
+    
+    stats = {}
+    stats['mean'] = np.array([122.04806, 119.54016, 112.30994])
+    stats['std'] = np.array([57.66770860299657, 50.870253477265315, 49.78745482650664])
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
 
 
 def main():
     dataset = InriaDs(
-        image_path='C:/Users/marie/ML/aerialimagelabeling/NEW2-AerialImageDataset/AerialImageDataset/train/images/austin11.tif',
-        label_path='C:/Users/marie/ML/aerialimagelabeling/NEW2-AerialImageDataset/AerialImageDataset/train/gt/austin11.tif',
+        image_path=os.path.join('/data/INRIA/AerialImageDataset/train', 'images/austin1.tif'),
+        label_path=os.path.join('/data/INRIA/AerialImageDataset/train', 'gt/austin1.tif'),
         crop_size=256,
         crop_step=256,
-        img_aug='no',
+        img_aug='imagenet',
         tile=Window(col_off=0, row_off=0, width=400, height=400),
         fixed_crops=True)
 
     #print(type(dataset))
-    for data in dataset:
-        pass
-    img = plt.imshow(dataset[0]['image'].numpy().transpose(1,2,0))
-        #print(type(data['window']))
-        #print(data, sep = '/n')
-    plt.show()
+    #for data in dataset:
+#        pass
+#    img = plt.imshow(dataset[0]['image'].numpy().transpose(1,2,0))
+#        #print(type(data['window']))
+#        #print(data, sep = '/n')
+#    plt.show()
 
 if __name__ == '__main__':
     main()
