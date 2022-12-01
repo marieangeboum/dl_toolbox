@@ -19,10 +19,10 @@ import rasterio
 from PIL import Image
 import torch
 parser = ArgumentParser()
-parser.add_argument('--townA', type=str, default='vienna')
+parser.add_argument('--townB', type=str, default='vienna')
 args = parser.parse_args()
 # temporaire  à changer pour mettre le nom de ville en args
-image_paths_list = glob.glob(os.path.join('/data/INRIA/AerialImageDataset/train', 'images/{}*.tif'.format(args.townA)))
+image_paths_list = glob.glob(os.path.join('/data/INRIA/AerialImageDataset/train', 'images/{}*.tif'.format(args.townB)))
 
 # list of E[X] for each channel/images
 meanR = []
