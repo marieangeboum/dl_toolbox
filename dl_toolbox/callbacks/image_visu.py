@@ -63,9 +63,9 @@ class SegmentationImagesVisualisation(pl.Callback):
                  
             TP = ((target.int() - np_preds_int) == 0)
             FP = ((target.int() - np_preds_int) == -1)
-            #FN = ((target.int() - np_preds_int) == 1)
+            FN = ((target.int() - np_preds_int) == 1)
                                    
-            overlay = torch.hstack((FP*255,np_preds_int*255,TP*255)).float()
+            overlay = torch.hstack((FP*255,np_preds_int*255,FN*255)).float()
                         
             # Number of grids to log depends on the batch size
             quotient, remainder = divmod(img.shape[0], self.NB_COL)
@@ -79,7 +79,7 @@ class SegmentationImagesVisualisation(pl.Callback):
                 else:
                     end = start + remainder
                     
-                img_grid = torchvision.utils.make_grid(img[start:end, :, :, :], padding=10, normalize=False)
+                img_grid = torchvision.utils.make_grid(img[start:end, :, :, :], padding=10, normalize=True)
                 orig_img_grid = torchvision.utils.make_grid(orig_img[start:end, :, :, :], padding=10, normalize=True)
                 out_grid = torchvision.utils.make_grid(np_preds_int[start:end, :, :, :], padding=10, normalize=True)
                 error_grid = torchvision.utils.make_grid(overlay[start:end, :, :, :], padding=10, normalize=True)
