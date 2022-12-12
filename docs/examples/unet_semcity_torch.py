@@ -24,7 +24,7 @@ from dl_toolbox.networks import UNet
 from dl_toolbox.callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
 from dl_toolbox.callbacks import plot_confusion_matrix, compute_conf_mat, EarlyStopping
 from dl_toolbox.utils import worker_init_function
-from dl_toolbox.torch_datasets import InriaDs
+from dl_toolbox.torch_datasets import InriaDs, InriaAustinDs, InriaAllDs
 from dl_toolbox.torch_datasets.utils import *
 
 from captum.insights import AttributionVisualizer, Batch
@@ -131,7 +131,8 @@ def main():
     # initializing loss function
     loss_fn = torch.nn.BCEWithLogitsLoss()
     print(loss_fn)
-
+    grey_transforms = transforms.Compose([transforms.Grayscale(num_output_channels=3)])
+    norm_transforms = transforms.Compose([transforms.Normalize(InriaAllDs.stats['mean'], InriaAllDs.stats['std'])])
     # initializing the optimizer
     #optimizer = Adam(model.parameters(), lr=0.01)
     optimizer = SGD(
@@ -175,7 +176,7 @@ def main():
 
             image = batch['image'].to(device)
             target = (batch['mask']/255.).to(device)
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaAustinDs.stats['std'])])
+            
             image = norm_transforms(image).to(device)
             
             # clear gradients wrt parameters
@@ -219,8 +220,7 @@ def main():
         for i, batch in enumerate(val_dataloader):
 
             image = batch['image'].to(device)
-            target = (batch['mask']/255.).to(device)
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaAustinDs.stats['std'])])
+            target = (batch['mask']/255.).to(device)           
             image = norm_transforms(image).to(device)
 
             output = model(image) # use this output in display_batch func
