@@ -42,7 +42,7 @@ class SegmentationImagesVisualisation(pl.Callback):
 
             img = batch['image'].cpu()
             orig_img = batch['orig_image'].cpu()
-            target = batch['mask'].cpu()
+            target = batch['mask'].cpu()/255
             preds = batch['preds'].cpu() # output de unet_semcity_torch
             #print(type(preds))
             
@@ -61,11 +61,11 @@ class SegmentationImagesVisualisation(pl.Callback):
                 
            
                  
-            TP = ((target.int() - np_preds_int) == 0)
+            TP = (target.int() & np_preds_int.int()) 
             FP = ((target.int() - np_preds_int) == -1)
-            FN = ((target.int() - np_preds_int) == 1)
-                                   
-            overlay = torch.hstack((FP*255,np_preds_int*255,FN*255)).float()
+            FN = ((target.int()==1 )& (np_preds_int.int() == 0))
+                                  
+            overlay = torch.cat([FN,np_preds_int,FP], dim =1).float().clip(0,1)
                         
             # Number of grids to log depends on the batch size
             quotient, remainder = divmod(img.shape[0], self.NB_COL)
@@ -81,18 +81,18 @@ class SegmentationImagesVisualisation(pl.Callback):
                     
                 img_grid = torchvision.utils.make_grid(img[start:end, :, :, :], padding=10, normalize=True)
                 orig_img_grid = torchvision.utils.make_grid(orig_img[start:end, :, :, :], padding=10, normalize=True)
-                out_grid = torchvision.utils.make_grid(np_preds_int[start:end, :, :, :], padding=10, normalize=True)
+                out_grid = torchvision.utils.make_grid(np_preds[start:end, :, :, :], padding=10, normalize=True)
                 error_grid = torchvision.utils.make_grid(overlay[start:end, :, :, :], padding=10, normalize=True)
-                grids = [orig_img_grid, img_grid, error_grid, out_grid]
+                grids = [orig_img_grid, img_grid,  error_grid, out_grid]
     
-                if batch['mask'] is not None:
-                    mask_grid = torchvision.utils.make_grid(np_labels[start:end, :, :, :], padding=10, normalize=True)
-                    #print(np_labels.shape())
-                    grids.append(mask_grid)
+                # if batch['mask'] is not None:
+                #     mask_grid = torchvision.utils.make_grid(np_labels[start:end, :, :, :], padding=10, normalize=True)
+                #     #print(np_labels.shape())
+                #     grids.append(mask_grid)
                     
                     
                 final_grid = torch.cat(grids, dim=1)
-    
+                
                 #trainer.logger.experiment.add_image(f'Images/{prefix}_batch_art_{idx}', final_grid, global_step=trainer.global_step)
                 writer.add_image(f'Images/{prefix}_batch_art_{idx}', final_grid, epoch+1)
 
