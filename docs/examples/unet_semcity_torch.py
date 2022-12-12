@@ -161,7 +161,7 @@ def main():
     writer = SummaryWriter("INRIA--smp_unet_{}--epoch_len-{}-sup_batch_size-{}-max_epochs-{}".format(args.townA, args.epoch_len,args.sup_batch_size,args.max_epochs))
     viz = SegmentationImagesVisualisation(writer = writer,freq = 10)
 
-    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}.pt'.format(args.townA))
+    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}_austin_all_norm.pt'.format(args.townA))
 
     
     for epoch in range(start_epoch, args.max_epochs):
@@ -249,10 +249,12 @@ def main():
                 break
             
         time_ep = time.time() - time_ep
-        writer.add_scalar('Loss/val', val_loss['loss'], epoch+1)
-        writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
-        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['no building','building']), epoch+1)
         
+        writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
+        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['0','1']), epoch+1)
+        writer.add_scalar('IoU/val', val_iou, epoch+1)
+        writer.add_scalar('Prec/val', val_precision, epoch+1)
+        writer.add_scalar('Recall/val', val_recall, epoch+1)
         
         values = [epoch + 1, train_loss['loss'], val_loss['loss'],train_acc['acc'],val_acc['acc'], time_ep]
         table = tabulate.tabulate([values], columns, tablefmt='simple',
@@ -263,7 +265,7 @@ def main():
     writer.add_graph(model, image)
     writer.flush()
     writer.close()
-    torch.save(model.state_dict(),'smp_unet_{}.pt'.format(args.townA))
+    #torch.save(model.state_dict(),'smp_unet_{}.pt'.format(args.townA))
 
 # do not forget to save model once evrthing is good
 # save metrics 
