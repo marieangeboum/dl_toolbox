@@ -160,3 +160,14 @@ outputs/
 # Local files
 local/
 bin/
+
+docs/examples/models/
+docs/examples/decouplages_vfinal/models/
+docs/examples/incrementalv1/models/
+docs/examples/incrementalv1/visualisation/
+docs/examples/incrementalv1/baseline/models/
+docs/examples/incrementalv1/baseline/visualisation/
+docs/examples/incrementalv1/replay/models/
+docs/examples/incrementalv1/replay/visualisation/
+docs/examples/incrementalv1/borne_sup/models/
+docs/examples/incrementalv1/borne_sup/visualisation/

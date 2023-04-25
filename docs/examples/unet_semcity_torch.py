@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--data_path", type=str)
     parser.add_argument("--epoch_len", type=int, default=10000)
     parser.add_argument("--sup_batch_size", type=int, default=16)
-    parser.add_argument("--crop_size", type=int, default=128)
+    parser.add_argument("--crop_size", type=int, default=256)
     parser.add_argument("--workers", default=6, type=int)
     parser.add_argument('--img_aug', type=str, default='no')
     parser.add_argument('--max_epochs', type=int, default=100)
@@ -66,8 +66,8 @@ def main():
     torch.cuda.manual_seed(args.seed)
 
     # temporaire  à changer pour mettre le nom de ville en args
-    townA_image_paths_list = glob.glob(os.path.join('/data/INRIA/AerialImageDataset/train', 'images/{}*.tif'.format(args.townA)))
-    townA_label_paths_list = glob.glob(os.path.join('/data/INRIA/AerialImageDataset/train', 'gt/{}*.tif'.format(args.townA)))
+    townA_image_paths_list = glob.glob(os.path.join(args.data_path, 'images/{}*.tif'.format(args.townA)))
+    townA_label_paths_list = glob.glob(os.path.join(args.data_path, 'gt/{}*.tif'.format(args.townA)))
 
 
     coef = 0.7
@@ -121,9 +121,9 @@ def main():
     # Unet model for SS task
     model = smp.Unet(
         encoder_name=args.encoder,
-        encoder_weights='imagenet' if args.pretrained else None,
+        encoder_weights= None,
         in_channels=args.in_channels,
-        classes=args.num_classes if args.train_with_void else args.num_classes - 1,
+        classes=1,
         decoder_use_batchnorm=True)
     model.to(device)
 
@@ -161,21 +161,21 @@ def main():
     writer = SummaryWriter("INRIA--smp_unet_{}--epoch_len-{}-sup_batch_size-{}-max_epochs-{}".format(args.townA, args.epoch_len,args.sup_batch_size,args.max_epochs))
     viz = SegmentationImagesVisualisation(writer = writer,freq = 10)
 
-    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}_austin_all_norm.pt'.format(args.townA))
+    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}.pt'.format(args.townA))
 
     
     for epoch in range(start_epoch, args.max_epochs):
 
         time_ep = time.time()
         loss_sum = 0.0
-        num_examples_train = 0.0
-        num_correct_train = 0.0
+        acc_sum = 0.0
+        
         model.train()
 
         for i, batch in enumerate(train_dataloader):
 
             image = batch['image'].to(device)
-            target = (batch['mask']/255.).to(device)
+            target = (batch['mask']/255).to(device)
             
             image = norm_transforms(image).to(device)
             
@@ -185,7 +185,7 @@ def main():
             #######################
             # forward to get outputs
             logits = model(image)
-            #print("LOGITS",logits)
+            
             # calculate loss
             #######################
             loss = loss_fn(logits, target)
@@ -196,14 +196,14 @@ def main():
             loss.backward()
             # updating parameters
             optimizer.step()
-            accuracy = Accuracy(num_classes=2).cuda()
+            accuracy = Accuracy(task = 'binary',num_classes=2).cuda()
             acc_sum += accuracy(torch.transpose(logits,0,1).reshape(2, -1).t(), torch.transpose(target.to(torch.uint8),0,1).reshape(2, -1).t())
 
             loss_sum += loss.item()
             
-            print("LOSS SUM: ",loss_sum)
+            #print("LOSS SUM: ",loss_sum)
 
-        print(len(train_dataloader))
+        
         viz.display_batch(writer, batch, 20,epoch,prefix='train')
         train_loss = {'loss': loss_sum / len(train_dataloader)}
         train_acc = {'acc': acc_sum/len(train_dataloader)}
@@ -212,7 +212,9 @@ def main():
 
         loss_sum = 0.0
         acc_sum = 0.0
-        
+        iou = 0.0
+        precision = 0.0
+        recall = 0.0
         scheduler.step()
 
         model.eval()
@@ -220,11 +222,11 @@ def main():
         for i, batch in enumerate(val_dataloader):
 
             image = batch['image'].to(device)
-            target = (batch['mask']/255.).to(device)           
+            target = (batch['mask']/255).to(device)           
             image = norm_transforms(image).to(device)
 
             output = model(image) # use this output in display_batch func
-            #print(output)
+            
 
             loss = loss_fn(output, target) # computing loss <> predicted output and labels
             
@@ -235,31 +237,37 @@ def main():
                 torch.tensor(target).flatten().cpu(),
                 torch.tensor((torch.sigmoid(output)>0.5).cpu().long().flatten().cpu()), 2)
             
-            
+            metrics_per_class_df, macro_average_metrics_df, micro_average_metrics_df = dl_inf.cm2metrics(cm.numpy()) 
+            iou += metrics_per_class_df.IoU[1]
+            precision += metrics_per_class_df.Precision[1]
+            recall += metrics_per_class_df.Recall[1]
             
             loss_sum += loss.item()
-            accuracy = Accuracy(num_classes=2).cuda()
+            accuracy = Accuracy(task = 'binary',num_classes=2).cuda()
             acc_sum += accuracy(torch.transpose(output,0,1).reshape(2, -1).t(), torch.transpose(target.to(torch.uint8),0,1).reshape(2, -1).t())
         viz.display_batch(writer, batch,10, epoch,prefix = 'val')    
         val_loss = {'loss': loss_sum / len(val_dataloader)} 
         val_acc = {'acc': acc_sum/ len(val_dataloader)}
+        val_iou = iou/len(val_dataloader)
+        val_precision = precision/len(val_dataloader)
+        val_recall = recall/len(val_dataloader)
+        
         early_stopping(val_loss['loss'], model)
         if early_stopping.early_stop:
                 print("Early stopping")
                 break
             
         time_ep = time.time() - time_ep
-        
-        writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
-        writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['0','1']), epoch+1)
-        writer.add_scalar('IoU/val', val_iou, epoch+1)
-        writer.add_scalar('Prec/val', val_precision, epoch+1)
-        writer.add_scalar('Recall/val', val_recall, epoch+1)
-        
+       	writer.add_scalar('Loss/val', val_loss['loss'], epoch+1)
+       	writer.add_scalar('Acc/val', val_acc['acc'], epoch+1)
+       	writer.add_figure('Confusion matrix', plot_confusion_matrix(cm.cpu(), class_names = ['0','1']), epoch+1)
+       	writer.add_scalar('IoU/val', val_iou, epoch+1)
+       	writer.add_scalar('Prec/val', val_precision, epoch+1)
+       	writer.add_scalar('Recall/val', val_recall, epoch+1)
         values = [epoch + 1, train_loss['loss'], val_loss['loss'],train_acc['acc'],val_acc['acc'], time_ep]
         table = tabulate.tabulate([values], columns, tablefmt='simple',
-                                  floatfmt='8.4f')
-        
+          floatfmt='8.4f')
+                
        
         print(table)
     writer.add_graph(model, image)

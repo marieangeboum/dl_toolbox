@@ -80,14 +80,22 @@ aug_dict = {
     'brightness': aug.Brightness,
     'color': aug.Color,
     'cutmix': aug.Cutmix,
-    'mixup': aug.Mixup
+    'mixup': aug.Mixup,
+    'albu-brightness' : aug.randomBrightContrast,
+    'albu-channel-shuffle': aug.ChannelShuffle,
+    # 'radio' : aug.,
+    # 'DA' : aug.
+    # 'vienna' : aug.InriaViennaNormalize,
+    # 'austin' : aug.InriaAustinNormalize
 }
 
+# cette fonction prend en entrée des mots clé à choisir parmi ceux du aug_dict 
 def get_transforms(name: str):
     
     parts = name.split('_')
     aug_list = []
     for part in parts:
+        #Dans  le cas où le nom de l'augment est color-3 elle lit 3 comme le paramètre bound 
         if part.startswith('color'):
             bounds = part.split('-')[-1]
             augment = aug.Color(bound=0.1*int(bounds))

@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from pytorch_lightning.utilities import rank_zero_warn
 import numpy as np
+from matplotlib import cm
 
 
 class SegmentationImagesVisualisation(pl.Callback):
@@ -50,7 +51,12 @@ class SegmentationImagesVisualisation(pl.Callback):
             #np_preds_rgb = torch.from_numpy(preds.detach().numpy()).float() # transform numpy array into torch tensor
             #np_preds = 255 - torch.from_numpy(preds.detach().numpy().astype(np.uint8)).float()
             # à faire avec sigmoid
-            np_preds = torch.from_numpy(torch.sigmoid(preds).detach().numpy()).float()
+            np_preds =torch.from_numpy(torch.sigmoid(preds).detach().numpy()).float()
+            
+            magma = cm.get_cmap('viridis')
+            
+            np_preds_cmap =torch.from_numpy(magma(np_preds)).squeeze(1).permute(0,3,1,2)[:,:3,:,:]
+            
             
             np_preds_int = torch.round(np_preds).cpu()
             if batch['mask'] is not None:
@@ -64,9 +70,10 @@ class SegmentationImagesVisualisation(pl.Callback):
             TP = (target.int() & np_preds_int.int()) 
             FP = ((target.int() - np_preds_int) == -1)
             FN = ((target.int()==1 )& (np_preds_int.int() == 0))
-                                  
             overlay = torch.cat([FN,np_preds_int,FP], dim =1).float().clip(0,1)
-                        
+            
+            
+            
             # Number of grids to log depends on the batch size
             quotient, remainder = divmod(img.shape[0], self.NB_COL)
             nb_grids = quotient + int(remainder > 0)
@@ -81,9 +88,10 @@ class SegmentationImagesVisualisation(pl.Callback):
                     
                 img_grid = torchvision.utils.make_grid(img[start:end, :, :, :], padding=10, normalize=True)
                 orig_img_grid = torchvision.utils.make_grid(orig_img[start:end, :, :, :], padding=10, normalize=True)
-                out_grid = torchvision.utils.make_grid(np_preds[start:end, :, :, :], padding=10, normalize=True)
+                out_grid = torchvision.utils.make_grid(np_preds_cmap[start:end, :, :, :], padding=10, normalize=False)
+                #out_grid_ceil = torchvision.utils.make_grid(overlay_ceil[start:end, :, :, :], padding=10, normalize=True)
                 error_grid = torchvision.utils.make_grid(overlay[start:end, :, :, :], padding=10, normalize=True)
-                grids = [orig_img_grid, img_grid,  error_grid, out_grid]
+                grids = [orig_img_grid, img_grid,error_grid, out_grid]
     
                 # if batch['mask'] is not None:
                 #     mask_grid = torchvision.utils.make_grid(np_labels[start:end, :, :, :], padding=10, normalize=True)

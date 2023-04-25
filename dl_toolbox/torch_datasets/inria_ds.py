@@ -73,14 +73,14 @@ class InriaDs(Dataset):
         ## Not here --> # vizualise the window crops extracted from the input image
 
         with rasterio.open(self.image_path) as image_file:
-            image = image_file.read(window=window, out_dtype=np.float32) # read the cropped part of the image
+            image_rasterio = image_file.read(window=window, out_dtype=np.float32) # read the cropped part of the image
             #print('image', type(image), image.shape)
             #plt.imshow(image.swapaxes(0,-1).astype(np.uint8))
             #plt.title(output_filename.format(int(window.col_off), int(window.row_off)))
             #plt.show()
 
         # converts image crop into a tensor more precisely returns a contiguous tensor containing the same data as self tensor.
-        image = torch.from_numpy(image).float().contiguous()
+        image = torch.from_numpy(image_rasterio).float().contiguous()
 
         label = None
         if self.label_path:
@@ -96,8 +96,13 @@ class InriaDs(Dataset):
             # converts label crop into contiguous tensor
             label = torch.from_numpy(label).float().contiguous()
 
-        if self.img_aug is not None:
+        if self.img_aug is not None:            
+            
+            #final_image, final_mask = self.img_aug(img = image_rasterio)
+                 
+                        
             final_image, final_mask = self.img_aug(img=image, label=label)
+            
         else:
             final_image, final_mask = image, label
         #print(type(final_image))
@@ -109,7 +114,15 @@ class InriaDs(Dataset):
                 'window':window,
                 'image':final_image,
                 'mask':final_mask}
+
+class InriaAllDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([103.2342, 108.95195, 100.14193])
+    stats['std'] = np.array([51.33931670054912, 46.79573419982041, 44.91756973961484])
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
 class InriaAustinDs(InriaDs): 
     stats = {}
     stats['mean'] = np.array([100.94032, 103.52946, 97.66165])
@@ -118,6 +131,32 @@ class InriaAustinDs(InriaDs):
     def __init__(self, *args, **kwargs):
         super().__init__(*args,**kwargs)
         
+class InriaAustinViennaDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([111.49419, 111.534805, 104.9858])
+    stats['std'] = np.array([52.45912203453931, 47.76822807494897, 46.511076854980935])
+    
+class InriaAustinChicagoDs(InriaDs):
+     stats = {}
+     stats['mean'] = np.array([102.17324, 106.39084, 97.57362])
+     stats['std'] = np.array([49.58811784858302, 48.39733419399045, 46.77620085468589])
+     def __init__(self, *args, **kwargs):
+         super().__init__(*args,**kwargs)
+
+class InriaAustinKitsapDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([94.735504, 100.02872, 90.35885])
+    stats['std'] = np.array([44.28662718159197, 40.28913937407239, 38.89959993891468])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+
+class InriaAustinTyrolDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([101.09303, 109.719696, 103.92902])
+    stats['std'] = np.array([47.03375700252017, 44.152273562608926, 40.735093809200116])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+                    
 class InriaViennaDs(InriaDs):
     
     stats = {}
@@ -126,8 +165,74 @@ class InriaViennaDs(InriaDs):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args,**kwargs)
+        
+class InriaViennaChicagoDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([112.727104, 114.39619, 104.89776])
+    stats['std'] = np.array([56.82721534164423, 52.25553889611134, 51.10869727288274])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
+        
+class InriaChicagoDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([103.40616, 109.25223, 97.48558])
+    stats['std'] = np.array([54.39979130122188, 53.109092671661216, 51.33737867461589])
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
 
-
+class InriaKitsapDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([88.53069, 96.52798, 83.05605])
+    stats['std'] = np.array([43.4744332715294, 37.07108946189805, 34.339593157374054])
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
+class InriaKitsapViennaDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([105.289375, 108.03407, 97.68299])
+    stats['std'] = np.array([53.74615708095641, 45.971866780980136, 45.19896403452171])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+class InriaKitsapChicagoDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([95.96843, 102.89011, 90.27081])
+    stats['std'] = np.array([49.7996177996896, 46.237382896976044, 44.26533158406535])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+                                                                                                       
+class InriaTyrolDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([101.24574, 115.90994, 110.196396])
+    stats['std'] = np.array([49.68618074976973, 44.43593357187328, 38.725287488448814])
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)  
+        
+class InriaTyrolViennaDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([111.6469, 117.725044, 111.25317])
+    stats['std'] = np.array([54.820844802431644, 47.796060196245, 44.61317686312147])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
+class InriaTyrolChicagoDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([102.32596, 112.581085, 103.84099])
+    stats['std'] = np.array([52.10751567379265, 49.077945778724676, 45.912720340474316])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        
+class InriaTyrolKitsapDs(InriaDs):
+    stats = {}
+    stats['mean'] = np.array([94.888214, 106.21896, 96.62622])
+    stats['std'] = np.array([47.11465058052803, 42.0514418187218, 39.03303183450496])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+    
 def main():
     dataset = InriaDs(
         image_path=os.path.join('/data/INRIA/AerialImageDataset/train', 'images/austin1.tif'),
@@ -137,6 +242,7 @@ def main():
         img_aug='imagenet',
         tile=Window(col_off=0, row_off=0, width=400, height=400),
         fixed_crops=True)
+    
 
     #print(type(dataset))
     #for data in dataset:
