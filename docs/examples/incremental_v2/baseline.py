@@ -105,6 +105,7 @@ def main():
     b_domain_img, b_domain_lbl = shuffle(np.array(b_domain_img),np.array(b_domain_lbl))
     b_domain_img = b_domain_img.tolist()
     b_domain_lbl = b_domain_lbl.tolist()
+    
     b_domain_img_train = b_domain_img[:int(len(b_domain_img)*args.train_split_coef)]
     b_domain_lbl_train = b_domain_lbl[:int(len(b_domain_img)*args.train_split_coef)]       
     b_domain_img_val = b_domain_img[int(len(b_domain_img)*args.train_split_coef):]

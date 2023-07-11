@@ -36,6 +36,8 @@ from captum.insights.attr_vis.features import ImageFeature
 
 
 
+    
+    
 def main():   
 
     # parser for argument easier to launch .py file and inintalizing arg. correctly
@@ -60,50 +62,63 @@ def main():
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
     parser.add_argument('--data_source', type = str)
-    parser.add_argument('--num_sequence', type = str, default = 's1')
     parser.add_argument('--train_split_coef', type = float, default = 0.8)
     parser.add_argument('--tile_width', type = int, default = 5000)
     parser.add_argument('--tile_height', type = int, default = 5000)
-    parser.add_argument('--model_path', type = str, default ="{}_{}_seed_{}")
+    parser.add_argument('--model_path', type = str, default ="sequence_{}/{}_{}_seed_{}")
     parser.add_argument('--expe_name', type = str, default = "step0")
     parser.add_argument('--encoder_weights', type = str, default = "imagenet")
+    parser.add_argument('--sequence_path', type = str, default = "incremental_v2/sequence_{}")
     parser.add_argument('--data_target', type = str)
-    #parser.add_argument('--saved_model_path',type = str, default = ")
     args = parser.parse_args()
     
     # Exécution sur GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    for run in range(2) :
-        seed = np.random.randint(0, 1000)
-        print(f"Seed: {seed}")
-        np.random.seed(seed)       
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
+   
+    seed = np.random.randint(0, 1000)
+    print(f"Seed: {seed}")
+    np.random.seed(seed)       
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    
+    torch.autograd.set_detect_anomaly(True) # stops training if something is wrong
+    
+    columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
+    norm_transforms = transforms.Compose([transforms.Normalize(InriaAllDs.stats['mean'], InriaAllDs.stats['std'])])
+   
+    # A domain
+    train_imgs = []
+    train_lbl = []
+    
+    test_imgs = []
+    test_lbl = []
+    
+    
+    if not os.path.exists(args.sequence_path.format(seed)):
+        os.makedirs(args.sequence_path.format(seed))
         
-        torch.autograd.set_detect_anomaly(True) # stops training if something is wrong
+    
+    
+    for domain in ('austin', 'chicago', 'kitsap', 'tyrol-w', 'vienna'):
         
-        train_visu = (args.model_path+"_result_viz").format(args.data_target, args.img_aug, seed)   
-        train_writer = SummaryWriter(train_visu)    
-        seg_img_visu = SegmentationImagesVisualisation(writer = train_writer,freq = 10)
-        columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
-          
-        early_stopping = EarlyStopping(patience=20, verbose=True,  delta=0.001,path=args.model_path.format(args.data_target, args.img_aug, seed))
+        img = glob.glob(os.path.join(args.data_path, 'images/{}*.tif'.format(domain)))
+        lbl = glob.glob(os.path.join(args.data_path, 'gt/{}*.tif'.format(domain)))
         
-        if args.data_target == 'austin':
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaAustinDs.stats['std'])])
-        if args.data_target == 'vienna':
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaViennaDs.stats['mean'], InriaViennaDs.stats['std'])])
-        if args.data_target == 'chicago':
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaChicagoDs.stats['std'])])
-        if args.data_target == 'tyrol-w':
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaTyrolDs.stats['mean'], InriaTyrolDs.stats['std'])])
-        if args.data_target == 'kitsap':
-            norm_transforms = transforms.Compose([transforms.Normalize(InriaKitsapDs.stats['mean'], InriaKitsapDs.stats['std'])])
-            
-        # A domain
-            
-        a_domain_img = glob.glob('train_s1_images/{}*.tif'.format(args.data_target))
-        a_domain_lbl = glob.glob('train_s1_gt/{}*.tif'.format(args.data_target))
+        img, lbl = shuffle(np.array(img),np.array(lbl))
+        
+        img = img.tolist()
+        lbl = lbl.tolist()
+        
+        train_imgs += img[:int(len(img)*args.train_split_coef)]
+        train_lbl  += lbl[:int(len(lbl)*args.train_split_coef)]
+        
+        test_imgs += img[int(len(img)*args.train_split_coef):]
+        test_lbl  += lbl[int(len(lbl)*args.train_split_coef):]
+    step =  0    
+    for args.data_target in args.sequence_list :        
+        
+        a_domain_imgs = [item for item in train_imgs if fnmatch.fnmatch(item, '{}*.tif'.format(args.data_target))]
+        a_domain_imgs = [item for item in train_lbl if fnmatch.fnmatch(item, '{}*.tif'.format(args.data_target))]
         a_domain_img, a_domain_lbl = shuffle(np.array(a_domain_img),np.array(a_domain_lbl))
                 
         a_domain_img = a_domain_img.tolist()
@@ -111,7 +126,7 @@ def main():
         
         a_domain_img_train = a_domain_img[:int(len(a_domain_img)*args.train_split_coef)]
         a_domain_lbl_train = a_domain_lbl[:int(len(a_domain_img)*args.train_split_coef)]
-        print(a_domain_img_train)   
+        
         a_domain_img_val = a_domain_img[int(len(a_domain_img)*args.train_split_coef):]
         a_domain_lbl_val = a_domain_lbl[int(len(a_domain_lbl)*args.train_split_coef):]
         
@@ -123,7 +138,7 @@ def main():
                                 crop_size=args.crop_size,
                                 crop_step=args.crop_size,
                                 img_aug=args.img_aug))
-
+    
         trainset = ConcatDataset(train_datasets)
         
         train_sampler = RandomSampler(
@@ -154,16 +169,26 @@ def main():
             batch_size=args.sup_batch_size,
             collate_fn = CustomCollate(batch_aug = 'no'),
             num_workers=args.workers)
-    
-        # UNet SS task
-        model = smp.Unet(
-            encoder_name=args.encoder,
-            encoder_weights=args.encoder_weights,
-            in_channels=args.in_channels,
-            classes=1,
-            decoder_use_batchnorm=True)
-        model.to(device)
         
+        if step !=0 : 
+            # UNet SS task
+            model = smp.Unet(
+                encoder_name=args.encoder,
+                encoder_weights=args.encoder_weights,
+                in_channels=3,
+                classes=1,
+                decoder_use_batchnorm=True)
+            model.to(device)
+            model.load_state_dict(torch.load(model_path))
+        else : 
+            # UNet SS task
+            model = smp.Unet(
+                encoder_name=args.encoder,
+                encoder_weights=args.encoder_weights,
+                in_channels=args.in_channels,
+                classes=1,
+                decoder_use_batchnorm=True)
+            model.to(device)
         # Initialize Loss
         loss_fn = torch.nn.BCEWithLogitsLoss()
         
@@ -193,6 +218,12 @@ def main():
         start_epoch = 0
         storage = False
         min_loss = 0
+        model_path= os.path.join(args.sequence_path.format(seed), 'seq{}_step{}'.format(seed, step))
+        early_stopping = EarlyStopping(patience=20, verbose=True,  delta=0.001,path=model_path)
+        
+        train_visu = (model_path+"_res")
+        train_writer = SummaryWriter(train_visu)    
+        seg_img_visu = SegmentationImagesVisualisation(writer = train_writer,freq = 10)
         for epoch in range(start_epoch, args.max_epochs):
             loss_sum = 0.0
             acc_sum  = 0.0
@@ -234,7 +265,6 @@ def main():
             iou = 0.0
             precision = 0.0
             recall = 0.0  
-            
             scheduler.step()
             model.eval() 
             
@@ -270,7 +300,7 @@ def main():
             
             early_stopping(val_loss['loss'], model)
             if early_stopping.early_stop:
-                    print("Early stopping")
+                    print("Early Stopping")
                     break
                 
             time_ep = time.time() - time_ep
@@ -288,6 +318,8 @@ def main():
         train_writer.add_graph(model, image)
         train_writer.flush()
         train_writer.close()
+        step +=1
+    
 
 if __name__ == "__main__":
 
