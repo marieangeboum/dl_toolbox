@@ -10,7 +10,7 @@ class CustomCollate(): # call in inria_ds batch_aug = no
     def __call__(self, batch, *args, **kwargs):
         # batch list de touts les dict des images extracted
         windows = [elem['window'] for elem in batch if 'window' in elem.keys()] # list of  all les window
-        keys_to_collate = ['image', 'orig_image', 'mask', 'orig_mask'] # liste des autres element  tensor qui sont envoyé au default collate
+        keys_to_collate = ['image', 'orig_image','id', 'mask', 'orig_mask'] # liste des autres element  tensor qui sont envoyé au default collate
         to_collate = [{k: v for k, v in elem.items() if (k in keys_to_collate) and (v is not None)} for elem in batch]
         batch = default_collate(to_collate)
         if 'mask' not in batch.keys():

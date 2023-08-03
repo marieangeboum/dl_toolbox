@@ -2,7 +2,6 @@
 from .raster_ds import RasterDs
 from .digitanie_ds import *
 from .inria_ds import *
-
 #from .multiple_images import MultipleImages
 #from .phr_pan_ndvi_ds import PhrPanNdviDs
 #from .phr_pan_ds import PhrPanDs
@@ -10,3 +9,5 @@ from .inria_ds import *
 from .semcity_bdsd_ds import *
 from .miniworld_ds import *
 from .resisc import *
+from .flairds import *
+from .flairds_id import *
