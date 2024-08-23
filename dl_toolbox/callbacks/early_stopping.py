@@ -14,7 +14,10 @@ import torch
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
+<<<<<<< HEAD
     
+=======
+>>>>>>> origin/MarieAngeBDev
     def __init__(self, patience=7, verbose=False, delta=0.03, path='checkpoint.pt', trace_func=print):
         """
         Args:
@@ -38,8 +41,14 @@ class EarlyStopping:
         self.delta = delta
         self.path = path
         self.trace_func = trace_func
+<<<<<<< HEAD
 
     def __call__(self, val_loss, model):
+=======
+        
+    def __call__(self, val_loss, model):
+
+>>>>>>> origin/MarieAngeBDev
         score = -val_loss
 
         if self.best_score is None:
@@ -56,6 +65,7 @@ class EarlyStopping:
             self.counter = 0
 
     def save_checkpoint(self, val_loss, model):
+<<<<<<< HEAD
         '''Saves model when validation loss decreases.'''
         if self.verbose:
             self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
@@ -77,3 +87,10 @@ class EarlyStopping:
         self.best_score = state['best_score']
         self.val_loss_min = state['val_loss_min']
         self.early_stop = state['early_stop']
+=======
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        torch.save(model.state_dict(), self.path)
+        self.val_loss_min = val_loss
+>>>>>>> origin/MarieAngeBDev

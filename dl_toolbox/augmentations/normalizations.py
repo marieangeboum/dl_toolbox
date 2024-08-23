@@ -1,6 +1,10 @@
 import torch
 import torchvision.transforms.functional as F
+<<<<<<< HEAD
 # from dl_toolbox.torch_datasets import InriaAustinDs, InriaAllDs, InriaViennaDs
+=======
+#from dl_toolbox.torch_datasets import InriaDs, InriaAustinDs, InriaAllDs, InriaViennaDs
+>>>>>>> origin/MarieAngeBDev
 
 class ImagenetNormalize:
 

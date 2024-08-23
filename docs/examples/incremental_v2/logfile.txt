@@ -1,0 +1,88 @@
+Seed: {seed} 
+ baseline domaine A {args.data_source} domaine B {args.data_target}Seed: {seed} 
+ baseline domaine A {args.data_source} domaine B {args.data_target}Seed: {seed} 
+ baseline {args.training_mode} domaine A {args.data_source} domaine B {args.data_target}Seed: {seed} 
+ baseline {args.training_mode} domaine A {args.data_source} domaine B {args.data_target}Seed: 544 
+ replay decoder domaines A ['chicago'] domaine B kitsap 
+
+Seed: 727 
+ replay decoder domaines A ['chicago'] domaine B kitsap 
+
+Seed: 544 
+ replay encoder_decoder domaines A ['chicago'] domaine B kitsap 
+
+Seed: 727 
+ replay encoder_decoder domaines A ['chicago'] domaine B kitsap 
+
+Seed: 727 
+ baseline decoder domaine A kitsap domaine B austin 
+
+Seed: 544 
+ replay decoder domaines A ['chicago', 'kitsap'] domaine B austin 
+
+Seed: 727 
+ baseline encoder_decoder domaine A kitsap domaine B austin 
+
+Seed: 727 
+ replay decoder domaines A ['chicago', 'kitsap'] domaine B austin 
+
+Seed: 544 
+ replay encoder_decoder domaines A ['chicago', 'kitsap'] domaine B austin 
+
+Seed: 727 
+ replay encoder_decoder domaines A ['chicago', 'kitsap'] domaine B austin 
+
+Seed: 727 
+ baseline decoder domaine A kitsap domaine B austin 
+
+Seed: 727 
+ baseline decoder domaine A austin domaine B tyrol-w 
+
+Seed: 727 
+ baseline encoder_decoder domaine A kitsap domaine B austin 
+
+Seed: 727 
+ baseline encoder_decoder domaine A austin domaine B tyrol-w 
+
+Seed: 544 
+ baseline decoder domaine A kitsap domaine B austin 
+
+Seed: 727 
+ baseline decoder domaine A tyrol-w domaine B vienna 
+
+Seed: 727 
+ baseline encoder_decoder domaine A tyrol-w domaine B vienna 
+
+Seed: 544 
+ replay decoder domaines A ['chicago', 'kitsap', 'austin'] domaine B tyrol-w 
+
+Seed: 727 
+ replay decoder domaines A ['chicago', 'kitsap', 'austin'] domaine B tyrol-w 
+
+Seed: 544 
+ replay encoder_decoder domaines A ['chicago', 'kitsap', 'austin'] domaine B tyrol-w 
+
+Seed: 727 
+ replay encoder_decoder domaines A ['chicago', 'kitsap', 'austin'] domaine B tyrol-w 
+
+Seed: 544 
+ baseline encoder_decoder domaine A kitsap domaine B austin 
+
+Seed: 544 
+ replay decoder domaines A ['chicago', 'kitsap', 'austin', 'tyrol-w'] domaine B vienna 
+
+Seed: 544 
+ replay encoder_decoder domaines A ['chicago', 'kitsap', 'austin', 'tyrol-w'] domaine B vienna 
+
+Seed: 544 
+ baseline decoder domaine A austin domaine B tyrol-w 
+
+Seed: 727 
+ replay decoder domaines A ['chicago', 'kitsap', 'austin', 'tyrol-w'] domaine B vienna 
+
+Seed: 544 
+ baseline encoder_decoder domaine A austin domaine B tyrol-w 
+
+Seed: 727 
+ replay encoder_decoder domaines A ['chicago', 'kitsap', 'austin', 'tyrol-w'] domaine B vienna 
+

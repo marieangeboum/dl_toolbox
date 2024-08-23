@@ -5,7 +5,10 @@ Created on Wed Sep 21 15:06:31 2022
 @author: marie
 """
 import os
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/MarieAngeBDev
 from torch.utils.data import Dataset
 import torch
 from dl_toolbox.utils import get_tiles
@@ -124,6 +127,7 @@ class InriaAllDs(InriaDs):
     def __init__(self, *args, **kwargs):
         super().__init__(*args,**kwargs)
         
+<<<<<<< HEAD
 class InriaAllDs_Id(InriaDs):
     stats = {}
     stats['mean'] = np.array([103.2342, 108.95195, 100.14193, 0])
@@ -139,6 +143,8 @@ class InriaAllDs_4C(InriaDs):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args,**kwargs)        
+=======
+>>>>>>> origin/MarieAngeBDev
 class InriaAustinDs(InriaDs): 
     stats = {}
     stats['mean'] = np.array([100.94032, 103.52946, 97.66165])
@@ -248,6 +254,10 @@ class InriaTyrolKitsapDs(InriaDs):
     stats['std'] = np.array([47.11465058052803, 42.0514418187218, 39.03303183450496])
     def __init__(self, *args, **kwargs):
         super().__init__(*args,**kwargs)
+<<<<<<< HEAD
+=======
+    
+>>>>>>> origin/MarieAngeBDev
 def main():
     dataset = InriaDs(
         image_path=os.path.join('/data/INRIA/AerialImageDataset/train', 'images/austin1.tif'),
@@ -257,6 +267,10 @@ def main():
         img_aug='imagenet',
         tile=Window(col_off=0, row_off=0, width=400, height=400),
         fixed_crops=True)
+<<<<<<< HEAD
+=======
+    
+>>>>>>> origin/MarieAngeBDev
 
     #print(type(dataset))
     #for data in dataset:

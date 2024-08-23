@@ -1,6 +1,33 @@
 import torch
 import torchvision.transforms.functional as F
 from .utils import Compose
+import  albumentations.augmentations.transforms as A
+import  albumentations.augmentations.domain_adaptation as DA
+
+
+
+class randomBrightContrast(torch.nn.Module):
+    def __init__(self, p=.5, bright_limit = 1, contrast_limit = 1):
+        super().__init__()
+        self.p = p
+        self.bright_limit = bright_limit
+        self.contrast_limit = contrast_limit
+        #self.albu_random_bright_contrast_aug = A.Compose([brightness_limit=1, contrast_limit=1, p=1.0])
+    def forward(self, img , label = None):
+        if torch.rand(1).item() < self.p:
+            return A.RandomBrightnessContrast(brightness_limit=1, contrast_limit=1, p=.5)
+        return img, label
+ 
+class ChannelShuffle(torch.nn.Module):
+    def __init__(self, p=0.5):
+        super().__init__()
+        self.p = p
+        
+    def forward(self, img, label = None):
+        if torch.rand(1).item() < self.p:
+            return A.ChannelShuffle(p =0.5)
+        return img, label
+    
 
 class Gamma(torch.nn.Module):
 
@@ -82,3 +109,5 @@ class Color():
 
     def __call__(self, image, label=None):
         return self.color_aug(image, label)
+
+

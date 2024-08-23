@@ -96,11 +96,22 @@ aug_dict = {
     'color': aug.Color,
     'cutmix': aug.Cutmix,
     'mixup': aug.Mixup,
+<<<<<<< HEAD
     # 'vienna' : data.InriaViennaNormalize,
     # 'austin' : data.InriaAustinNormalize
 }
 
 
+=======
+    'albu-brightness' : aug.randomBrightContrast,
+    'albu-channel-shuffle': aug.ChannelShuffle,
+    # 'radio' : aug.,
+    # 'DA' : aug.
+    # 'vienna' : aug.InriaViennaNormalize,
+    # 'austin' : aug.InriaAustinNormalize
+}
+
+>>>>>>> origin/MarieAngeBDev
 # cette fonction prend en entrée des mots clé à choisir parmi ceux du aug_dict 
 def get_transforms(name: str):
     
