@@ -124,6 +124,7 @@ def main():
         tile=Window(col_off=500, row_off=502, width=400, height=400),
         fixed_crops=False
     )
+    
 
     for data in dataset:
         pass

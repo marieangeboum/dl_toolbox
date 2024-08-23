@@ -1,5 +1,6 @@
+import torch
 import torchvision.transforms.functional as F
-
+# from dl_toolbox.torch_datasets import InriaAustinDs, InriaAllDs, InriaViennaDs
 
 class ImagenetNormalize:
 
@@ -12,3 +13,18 @@ class ImagenetNormalize:
                 )
         return img, label
 
+# class InriaAustinNormalize:
+#     def __call__(self,img,label=None):
+#         img = F.normalize(img,mean = InriaAustinDs.stats['mean'], std = InriaAustinDs.stats['mean'])
+#         return img, label
+    
+# class InriaViennaNormalize:
+#     def __call__(self,img,label=None):
+#         img = F.normalize(img,mean = InriaViennaDs.stats['mean'], std = InriaViennaDs.stats['mean'])
+#         return img, label
+    
+# class InriaAllNormalize:
+#     def __call__(self,img,label=None):
+#         img = F.normalize(img,mean = InriaAllDs.stats['mean'], std = InriaAllDs.stats['mean'])
+#         return img, label
+    

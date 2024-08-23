@@ -28,7 +28,7 @@ def plot_confusion_matrix(cm, class_names):
     
     ax1.imshow(cm_recall, interpolation="nearest", cmap=plt.cm.Blues)
     ax1.set_title("Recall matrix")
-    ax1.set_xticks(tick_marks, class_names, rotation=90)
+    ax1.set_xticks(tick_marks, class_names)
     ax1.set_yticks(tick_marks, class_names)
     # Compute the labels from the normalized confusion matrix.
     # labels = np.around(cm.astype("float"), decimals=2)
@@ -43,7 +43,7 @@ def plot_confusion_matrix(cm, class_names):
     
     ax2.imshow(cm_precision, interpolation="nearest", cmap=plt.cm.Blues)
     ax2.set_title("Precision matrix")
-    ax2.set_xticks(tick_marks, class_names, rotation=90)
+    ax2.set_xticks(tick_marks, class_names)
     #ax2.set_yticks(tick_marks, class_names)
     # Compute the labels from the normalized confusion matrix.
     # labels = np.around(cm.astype("float"), decimals=2)
@@ -74,13 +74,13 @@ def compute_conf_mat(labels, preds, num_classes, ignore_idx=None):
 
 class ConfMatLogger(pl.Callback):
 
-    def __init__(self, labels, freq, *args, **kwargs):
+    def __init__(self, labels,freq, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
         self.labels = labels
         self.freq = freq
 
-    def on_fit_start(self, trainer, pl_module):
+    def on_fit_start(self, writer):
 
         self.conf_mat = ConfusionMatrix(
             num_classes=len(self.labels),
@@ -89,31 +89,31 @@ class ConfMatLogger(pl.Callback):
         )
 
     def on_validation_batch_end(
-            self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+            self, writer, batch, batch_idx, dataloader_idx, epoch
     ):
         
-        if trainer.current_epoch % self.freq == 0:
+        if epoch % self.freq == 0:
             
-            batch = outputs['batch']
+            #batch = outputs['batch']
             labels = batch['mask'].cpu() # labels shape B,H,W, values in {0, C-1}
             preds = batch['preds'].cpu() 
             self.conf_mat(preds, labels)
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self,epoch, writer):
         
-        if trainer.current_epoch % self.freq == 0:
+        if epoch % self.freq == 0:
 
             cm = self.conf_mat.compute().numpy()
             cm_recall = cm/np.sum(cm,axis=1, keepdims=True)
             cm_precision = cm/np.sum(cm,axis=0,keepdims=True)
             
-            trainer.logger.experiment.add_figure(
+            writer.add_figure(
                 "Confusion matrix recall", 
-                plot_confusion_matrix(cm_recall, class_names=self.labels), 
-                global_step=trainer.global_step
+                plot_confusion_matrix(torch.from_numpy(cm_recall), class_names=self.labels), 
+                global_step=epoch+1
             )
-            trainer.logger.experiment.add_figure(
+            writer.add_figure(
                 "Confusion matrix precision", 
-                plot_confusion_matrix(cm_precision, class_names=self.labels), 
-                global_step=trainer.global_step
+                plot_confusion_matrix(torch.from_numpy(cm_precision), class_names=self.labels), 
+                global_step=epoch+1
             )

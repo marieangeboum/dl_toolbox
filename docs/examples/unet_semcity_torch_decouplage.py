@@ -24,7 +24,7 @@ from dl_toolbox.networks import UNet
 from dl_toolbox.callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
 from dl_toolbox.callbacks import plot_confusion_matrix, compute_conf_mat, EarlyStopping
 from dl_toolbox.utils import worker_init_function
-from dl_toolbox.torch_datasets import InriaDs, InriaAustinDs, InriaAllDs
+from dl_toolbox.torch_datasets import InriaDs, InriaAustinDs, InriaAllDs, InriaViennaDs
 from dl_toolbox.torch_datasets.utils import *
 
 from captum.insights import AttributionVisualizer, Batch
@@ -56,7 +56,8 @@ def main():
     parser.add_argument('--max_epochs', type=int, default=100)
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--townA', type = str, default = 'austin')
+    parser.add_argument('--townA', type = str)
+    parser.add_argument('--model_path', type = str, default ="smp_unet_{}_E+D" )
     args = parser.parse_args()
     # execution sur GPU si  ce dernier est dispo
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -132,7 +133,7 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss()
     print(loss_fn)
     grey_transforms = transforms.Compose([transforms.Grayscale(num_output_channels=3)])
-    norm_transforms = transforms.Compose([transforms.Normalize(InriaAllDs.stats['mean'], InriaAllDs.stats['std'])])
+    norm_transforms = transforms.Compose([transforms.Normalize(InriaAustinDs.stats['mean'], InriaAustinDs.stats['std'])])
     # initializing the optimizer
     #optimizer = Adam(model.parameters(), lr=0.01)
     optimizer = SGD(
@@ -158,10 +159,9 @@ def main():
 
     start_epoch = 0
     columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
-    writer = SummaryWriter("INRIA--smp_unet_{}--epoch_len-{}-sup_batch_size-{}-max_epochs-{}".format(args.townA, args.epoch_len,args.sup_batch_size,args.max_epochs))
+    writer = SummaryWriter(('Viz '+args.model_path).format(args.townA))
     viz = SegmentationImagesVisualisation(writer = writer,freq = 10)
-
-    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}.pt'.format(args.townA))
+    early_stopping = EarlyStopping(patience=20, verbose=True,  delta=0.001,path=args.model_path.format(args.townA))
 
     
     for epoch in range(start_epoch, args.max_epochs):
@@ -176,8 +176,7 @@ def main():
 
             image = batch['image'].to(device)
             target = (batch['mask']/255).to(device)
-            
-            image = norm_transforms(image).to(device)
+            image = grey_transforms(image).to(device)
             
             # clear gradients wrt parameters
             optimizer.zero_grad()
@@ -223,11 +222,9 @@ def main():
 
             image = batch['image'].to(device)
             target = (batch['mask']/255).to(device)           
-            image = norm_transforms(image).to(device)
+            image = grey_transforms(image).to(device)
 
             output = model(image) # use this output in display_batch func
-            
-
             loss = loss_fn(output, target) # computing loss <> predicted output and labels
             
             batch['preds'] = output
@@ -267,20 +264,13 @@ def main():
         values = [epoch + 1, train_loss['loss'], val_loss['loss'],train_acc['acc'],val_acc['acc'], time_ep]
         table = tabulate.tabulate([values], columns, tablefmt='simple',
           floatfmt='8.4f')
-                
-       
         print(table)
     writer.add_graph(model, image)
     writer.flush()
     writer.close()
     #torch.save(model.state_dict(),'smp_unet_{}.pt'.format(args.townA))
 
-# do not forget to save model once evrthing is good
-# save metrics 
-# with open('metrics_final_valid_batch.txt', mode='w') as file_object:
-#      print(metrics_per_class_df, file=file_object)
-#      print(macro_average_metrics_df, file=file_object)
-#      print(micro_average_metrics_df, file=file_object)
+
 if __name__ == "__main__":
 
     main()

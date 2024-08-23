@@ -51,6 +51,7 @@ class Brightness(torch.nn.Module):
         return img, label
 
 
+
 class Contrast(torch.nn.Module):
 
     def __init__(self, bound=0.4, p=0.5):

@@ -24,7 +24,7 @@ from dl_toolbox.networks import UNet
 from dl_toolbox.callbacks import SegmentationImagesVisualisation, CustomSwa, ConfMatLogger
 from dl_toolbox.callbacks import plot_confusion_matrix, compute_conf_mat, EarlyStopping
 from dl_toolbox.utils import worker_init_function
-from dl_toolbox.torch_datasets import InriaDs, InriaAustinDs, InriaAllDs
+from dl_toolbox.torch_datasets import InriaDs, InriaAustinDs, InriaAllDs, InriaViennaDs
 from dl_toolbox.torch_datasets.utils import *
 
 from captum.insights import AttributionVisualizer, Batch
@@ -132,7 +132,7 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss()
     print(loss_fn)
     grey_transforms = transforms.Compose([transforms.Grayscale(num_output_channels=3)])
-    norm_transforms = transforms.Compose([transforms.Normalize(InriaAllDs.stats['mean'], InriaAllDs.stats['std'])])
+    norm_transforms = transforms.Compose([transforms.Normalize(InriaViennaDs.stats['mean'], InriaViennaDs.stats['std'])])
     # initializing the optimizer
     #optimizer = Adam(model.parameters(), lr=0.01)
     optimizer = SGD(
@@ -158,10 +158,10 @@ def main():
 
     start_epoch = 0
     columns = ['ep', 'train_loss', 'val_loss','train_acc','val_acc', 'time']
-    writer = SummaryWriter("INRIA--smp_unet_{}--epoch_len-{}-sup_batch_size-{}-max_epochs-{}".format(args.townA, args.epoch_len,args.sup_batch_size,args.max_epochs))
+    writer = SummaryWriter("INRIA--smp_unet_{}--epoch_len-{}-sup_batch_size-{}_no_norm".format(args.townA, args.epoch_len,args.sup_batch_size,args.max_epochs))
     viz = SegmentationImagesVisualisation(writer = writer,freq = 10)
 
-    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}.pt'.format(args.townA))
+    early_stopping = EarlyStopping(patience=10, verbose=True,  delta=0.03,path='smp_unet_{}_no_norm.pt'.format(args.townA))
 
     
     for epoch in range(start_epoch, args.max_epochs):
@@ -177,8 +177,8 @@ def main():
             image = batch['image'].to(device)
             target = (batch['mask']/255).to(device)
             
-            image = norm_transforms(image).to(device)
-            
+            #image = norm_transforms(image).to(device)
+            #image = (image/255).to(device)
             # clear gradients wrt parameters
             optimizer.zero_grad()
             # mask processing to do here ???
@@ -223,8 +223,9 @@ def main():
 
             image = batch['image'].to(device)
             target = (batch['mask']/255).to(device)           
-            image = norm_transforms(image).to(device)
-
+            #image = norm_transforms(image).to(device)
+            #image = (image/255).to(device)
+	
             output = model(image) # use this output in display_batch func
             
 

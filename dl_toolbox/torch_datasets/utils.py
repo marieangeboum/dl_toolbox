@@ -2,6 +2,7 @@ import numpy as np
 import rasterio
 #import gdal
 import dl_toolbox.augmentations as aug
+# import dl_toolbox.torch_datasets as data
 
 def minmax(image, m, M):
     
@@ -39,7 +40,21 @@ def read_window_basic(window, path):
 #    ).astype(np.float32)
 #    ds = None
 #    return image
-#
+#class InriaAustinNormalize:
+#     def __call__(self,img,label=None):
+#         img = F.normalize(img,mean = InriaAustinDs.stats['mean'], std = InriaAustinDs.stats['mean'])
+#         return img, label
+    
+# class InriaViennaNormalize:
+#     def __call__(self,img,label=None):
+#         img = F.normalize(img,mean = InriaViennaDs.stats['mean'], std = InriaViennaDs.stats['mean'])
+#         return img, label
+    
+# class InriaAllNormalize:
+#     def __call__(self,img,label=None):
+#         img = F.normalize(img,mean = InriaAllDs.stats['mean'], std = InriaAllDs.stats['mean'])
+#         return img, label
+    
 #def read_window_from_big_raster_gdal(window, path, raster_path):
 #
 #    with rasterio.open(path) as image_file:
@@ -80,14 +95,19 @@ aug_dict = {
     'brightness': aug.Brightness,
     'color': aug.Color,
     'cutmix': aug.Cutmix,
-    'mixup': aug.Mixup
+    'mixup': aug.Mixup,
+    # 'vienna' : data.InriaViennaNormalize,
+    # 'austin' : data.InriaAustinNormalize
 }
 
+
+# cette fonction prend en entrée des mots clé à choisir parmi ceux du aug_dict 
 def get_transforms(name: str):
     
     parts = name.split('_')
     aug_list = []
     for part in parts:
+        #Dans  le cas où le nom de l'augment est color-3 elle lit 3 comme le paramètre bound 
         if part.startswith('color'):
             bounds = part.split('-')[-1]
             augment = aug.Color(bound=0.1*int(bounds))

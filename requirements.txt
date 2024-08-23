@@ -8,3 +8,8 @@ torch
 segmentation_models_pytorch
 pytorch_lightning
 torchmetrics==0.7.2
+torchsummary
+captum
+Flask
+Flask-Compress
+

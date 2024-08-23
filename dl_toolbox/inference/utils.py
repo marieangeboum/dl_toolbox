@@ -11,7 +11,7 @@ from dl_toolbox.utils import worker_init_function, get_tiles
 import torchmetrics.functional as  M
 import dl_toolbox.augmentations as aug 
 import pandas as pd
-from sklearn.metrics._plot.confusion_matrix import ConfusionMatrixDisplay
+#from sklearn.metrics._plot.confusion_matrix import ConfusionMatrixDisplay
 from dl_toolbox.torch_datasets.utils import *
 from functools import partial
 
