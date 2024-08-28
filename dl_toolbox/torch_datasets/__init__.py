@@ -10,7 +10,3 @@ from .semcity_bdsd_ds import *
 from .miniworld_ds import *
 from .resisc import *
 from .flairds import *
-<<<<<<< HEAD
-=======
-from .flairds_id import *
->>>>>>> origin/MarieAngeBDev

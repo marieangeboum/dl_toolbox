@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-=======
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -7,7 +6,7 @@ Created on Thu Jun 29 17:14:18 2023
 
 @author: maboum
 """
->>>>>>> origin/MarieAngeBDev
+
 import os
 import sys
 from torch.utils.data import Dataset
@@ -109,14 +108,12 @@ class FlairDs(Dataset):
             
         else:
             final_image, final_mask = image, final_mask_bati
-<<<<<<< HEAD
-        
-=======
+
         #print(type(final_image))
         #print(type(window))
         #window = np.array(window)
         #print(type(window),shape(window))
->>>>>>> origin/MarieAngeBDev
+
         return {'orig_image':image,
                 'orig_mask': label,
                 'id' : domain_pattern,
@@ -124,7 +121,6 @@ class FlairDs(Dataset):
                 'image':final_image,
                 'mask':final_mask}
 
-<<<<<<< HEAD
 class ClassifFlairDs(Dataset):
 
     def __init__(self,image_path,tile,fixed_crops, crop_size,crop_step, img_aug,label_path=None, *args,**kwargs):
@@ -219,8 +215,7 @@ class ClassifFlairDs(Dataset):
                 'image':final_image,
                 'label':final_label_classification}
 
-=======
->>>>>>> origin/MarieAngeBDev
+
 def main():
     dataset = FlairDs(
         image_path=os.path.join('data/flair_merged/train/', 'D017_2018/IMG_Z2_AU.tif'),
