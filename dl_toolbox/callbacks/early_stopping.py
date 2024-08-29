@@ -48,11 +48,11 @@ class EarlyStopping:
         loss_score = -val_loss
         iou_score = val_iou
 
-        # Check if both validation loss improved and IoU increased
-        if (self.best_loss_score is None or loss_score < self.best_loss_score + self.delta_loss) and \
-           (self.best_iou_score is None or iou_score > self.best_iou_score + self.delta_iou):
+        # Check if validation loss improved and IoU is better than the highest IoU reached
+        if (self.best_loss_score is None or loss_score > self.best_loss_score - self.delta_loss) and \
+        (self.best_iou_score is None or iou_score > self.best_iou_score):
             self.best_loss_score = loss_score
-            self.best_iou_score = iou_score
+            self.best_iou_score = max(iou_score, self.best_iou_score)  # Update best IoU score if current IoU score is better
             self.save_checkpoint(val_loss, val_iou, model)
             self.counter = 0  # Reset counter when both conditions are met
         else:
