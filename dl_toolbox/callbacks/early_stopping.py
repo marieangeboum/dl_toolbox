@@ -35,7 +35,7 @@ class EarlyStopping:
         self.verbose = verbose
         self.counter = 0
         self.best_loss_score = None
-        self.best_iou_score = None
+        self.best_iou_score = float('-inf')
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.val_iou_max = 0.0
@@ -46,13 +46,17 @@ class EarlyStopping:
 
     def __call__(self, val_loss, val_iou, model):
         loss_score = -val_loss
-        iou_score = val_iou
+        iou_score = val_iou.item() if isinstance(val_iou, torch.Tensor) else val_iou
+
+        # If best_iou_score is None, initialize it with current iou_score
+        if self.best_iou_score is None:
+            self.best_iou_score = iou_score
 
         # Check if validation loss improved and IoU is better than the highest IoU reached
         if (self.best_loss_score is None or loss_score > self.best_loss_score - self.delta_loss) and \
-        (self.best_iou_score is None or iou_score > self.best_iou_score):
+                (iou_score > self.best_iou_score):
             self.best_loss_score = loss_score
-            self.best_iou_score = max(iou_score, self.best_iou_score)  # Update best IoU score if current IoU score is better
+            self.best_iou_score = iou_score  # Update best IoU score with the current IoU score
             self.save_checkpoint(val_loss, val_iou, model)
             self.counter = 0  # Reset counter when both conditions are met
         else:
