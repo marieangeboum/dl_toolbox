@@ -59,6 +59,10 @@ class EarlyStopping:
             self.best_iou_score = iou_score  # Update best IoU score with the current IoU score
             self.save_checkpoint(val_loss, val_iou, model)
             self.counter = 0  # Reset counter when both conditions are met
+        elif iou_score > self.best_iou_score:
+            self.best_iou_score = iou_score  # Update best IoU score with the current IoU score
+            self.save_checkpoint(val_loss, val_iou, model)
+            self.counter = 0  # Reset counter when IoU increases
         else:
             self.counter += 1
             self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
