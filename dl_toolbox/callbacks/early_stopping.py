@@ -57,11 +57,11 @@ class EarlyStopping:
                 (iou_score > self.best_iou_score):
             self.best_loss_score = loss_score
             self.best_iou_score = iou_score  # Update best IoU score with the current IoU score
-            self.save_checkpoint(val_loss, val_iou, model)
+            self._save_checkpoint_(val_loss, val_iou, model)
             self.counter = 0  # Reset counter when both conditions are met
         elif iou_score > self.best_iou_score:
             self.best_iou_score = iou_score  # Update best IoU score with the current IoU score
-            self.save_checkpoint(val_loss, val_iou, model)
+            self._save_checkpoint_(val_loss, val_iou, model)
             self.counter = 0  # Reset counter when IoU increases
         else:
             self.counter += 1
@@ -69,7 +69,7 @@ class EarlyStopping:
             if self.counter >= self.patience:
                 self.early_stop = True
 
-    def save_checkpoint(self, val_loss, val_iou, model):
+    def _save_checkpoint_(self, val_loss, val_iou, model):
         '''Saves model when both validation loss decreases and IoU increases.'''
         if self.verbose:
             self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}) and IoU increased ({self.val_iou_max:.6f} --> {val_iou:.6f}). Saving model ...')
